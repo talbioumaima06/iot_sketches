@@ -3,46 +3,62 @@
 #include <Firebase_ESP_Client.h>
 #include <DHT.h>
 #include <Adafruit_NeoPixel.h>
+
 #include "addons/TokenHelper.h"
 #include "addons/RTDBHelper.h"
 
+// WiFi Credentials
 #define WIFI_SSID "Redmi Note 13"
 #define WIFI_PASSWORD "1234567899"
+
+// Firebase Configuration
 #define API_KEY "AIzaSyCiWthdW9oA6TIm1vBJSCq83Q4IKRGdm7E"
 #define DATABASE_URL "https://litbebe-a66b1-default-rtdb.europe-west1.firebasedatabase.app/"
 
+// Firebase Data objects
 FirebaseData fbdo;
 FirebaseAuth auth;
 FirebaseConfig config;
 bool signupOK = false;
 
-#define capteur 19
-int threshold = 40;
+// Ultrasonic Sensor
+#define CAPTEUR 19
+int threshold = 400;
 unsigned long lastMovementTime = 0;
 unsigned long sleepingDelay = 3000;
 String currentStatus = "";
 
+// Movement Sensor
 int CapteurMvt = 15;
 
+// NeoPixel LED
 #define LED_PIN 22
 #define NUMPIXELS 100
 Adafruit_NeoPixel strip(NUMPIXELS, LED_PIN, NEO_GRB + NEO_KHZ800);
 
+// DHT Sensor
 #define DHT_SENSOR_PIN 4
 #define DHT_SENSOR_TYPE DHT11
 DHT dht_sensor(DHT_SENSOR_PIN, DHT_SENSOR_TYPE);
 unsigned long sendDataPrevMillis = 0;
+int count = 0;
 
 void setup() {
+  // Initialize DHT sensor
   dht_sensor.begin();
+  
+  // Initialize NeoPixel
   strip.begin();
   strip.setBrightness(50);
 
+  // Set sensor pin modes
   pinMode(CapteurMvt, INPUT);
-  pinMode(capteur, INPUT);
+  pinMode(CAPTEUR, INPUT);
 
+  // Initialize Serial for user input and debug
   Serial.begin(115200);
 
+  // Initialize WiFi
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
   Serial.print("Connecting to Wi-Fi");
   while (WiFi.status() != WL_CONNECTED) {
@@ -54,34 +70,34 @@ void setup() {
   Serial.println(WiFi.localIP());
   Serial.println();
 
+  // Firebase configuration
   config.api_key = API_KEY;
   config.database_url = DATABASE_URL;
 
-  if (Firebase.signUp(&config, &auth, "tb.talbioumaima@gmail.com", "tb.talbioumaima@gmail.com")) {
+  // Sign up
+  if (Firebase.signUp(&config, &auth, "", "")) {
     Serial.println("ok");
     signupOK = true;
-  } else {    
-    Serial.println("noot ookkkkkkkkkkkkkkkkkkkkkk");
+  } else {
     Serial.printf("%s\n", config.signer.signupError.message.c_str());
   }
 
-  config.token_status_callback = tokenStatusCallback;
   Firebase.begin(&config, &auth);
   Firebase.reconnectWiFi(true);
 
+  // Initialize lastMovementTime to current time
   lastMovementTime = millis();
 }
 
 void loop() {
-  //checkTemperatureHumidity();
-  //checkSerialInput();
-  //checkRGBValueChanges();
-  //checkMovementSensor();
-  //checkSoundSensor();
-  delay(1000); // Optional delay to prevent continuous printing
+  temperatureHumiditySensor();
+  //rgbSensor();
+  movementSensor();
+  soundSensor();
+  delay(500);
 }
 
-void checkTemperatureHumidity() {
+void temperatureHumiditySensor() {
   float temperature = dht_sensor.readTemperature();
   float humidity = dht_sensor.readHumidity();
 
@@ -105,7 +121,7 @@ void checkTemperatureHumidity() {
   }
 }
 
-void checkSerialInput() {
+void rgbSensor() {
   if (Serial.available() > 0) {
     String input = Serial.readStringUntil('\n');
     int r, g, b;
@@ -113,15 +129,13 @@ void checkSerialInput() {
     setColor(strip.Color(r, g, b));
     Firebase.RTDB.setString(&fbdo, "LED/RGB", input);
   }
-}
 
-void checkRGBValueChanges() {
   if (Firebase.ready() && signupOK) {
     String rgbValues;
     if (Firebase.RTDB.getString(&fbdo, "LED/RGB", &rgbValues)) {
       int r, g, b;
       sscanf(rgbValues.c_str(), "%d %d %d", &r, &g, &b);
-      //setColor(strip.Color(r, g, b));
+      setColor(strip.Color(r, g, b));
     } else {
       Serial.println("Failed to get RGB data");
       Serial.println("REASON: " + fbdo.errorReason());
@@ -129,27 +143,27 @@ void checkRGBValueChanges() {
   }
 }
 
-void checkMovementSensor() {
+void movementSensor() {
   int sensorValue = digitalRead(CapteurMvt);
-  String status;
-
   if (sensorValue == HIGH) {
-    status = "Your baby has moved";
+    Serial.println("Your baby has moved ");
+    if (Firebase.ready() && signupOK) {
+      Firebase.RTDB.setString(&fbdo, "Sensor/Mvt_Status", "Your baby has moved");
+    }
   } else {
-    // Generate random string
-    String randomString = generateRandomString(10); // Change 10 to the desired length of the random string
-    status = randomString;
-  }
-
-  Serial.println(status);
-
-  if (Firebase.ready() && signupOK) {
-    Firebase.RTDB.setString(&fbdo, "Sensor/Mvt_Status", status);
+    Serial.println("Your baby is calm ");
+    if (Firebase.ready() && signupOK) {
+      Firebase.RTDB.setString(&fbdo, "Sensor/Mvt_Status", "Your baby is calm");
+    }
   }
 }
 
-void checkSoundSensor() {
-  int soundLevel = analogRead(capteur);
+void soundSensor() {
+  int soundLevel = analogRead(CAPTEUR);
+  // Log the sound level
+  Serial.print("Sound levelllllllllllllllllllllll: ");
+  Serial.println(soundLevel);
+
   if (soundLevel > threshold) {
     Serial.println("Your baby has woken up!");
     lastMovementTime = millis();
@@ -176,17 +190,6 @@ void checkSoundSensor() {
       }
     }
   }
-}
-
-String generateRandomString(int length) {
-  String randomString;
-  const char charset[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-
-  for (int i = 0; i < length; i++) {
-    randomString += charset[random(0, sizeof(charset) - 1)];
-  }
-
-  return randomString;
 }
 
 void setColor(uint32_t color) {
