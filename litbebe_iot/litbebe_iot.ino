@@ -81,7 +81,7 @@ void setup() {
   } else {
     Serial.printf("%s\n", config.signer.signupError.message.c_str());
   }
-
+  //config.token_status_callback = tokenStatusCallback; // see addons/TokenHelper.h
   Firebase.begin(&config, &auth);
   Firebase.reconnectWiFi(true);
 
@@ -94,7 +94,7 @@ void loop() {
   //rgbSensor();
   movementSensor();
   soundSensor();
-  delay(500);
+  delay(3000);
 }
 
 void temperatureHumiditySensor() {
@@ -159,12 +159,12 @@ void movementSensor() {
 }
 
 void soundSensor() {
-  int soundLevel = analogRead(CAPTEUR);
+  int soundLevel = digitalRead(CAPTEUR);
   // Log the sound level
   Serial.print("Sound levelllllllllllllllllllllll: ");
   Serial.println(soundLevel);
 
-  if (soundLevel > threshold) {
+  if (soundLevel == 1 ) {
     Serial.println("Your baby has woken up!");
     lastMovementTime = millis();
     if (Firebase.ready() && signupOK && currentStatus != "Your baby has woken up!") {
