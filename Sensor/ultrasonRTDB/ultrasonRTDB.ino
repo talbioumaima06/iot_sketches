@@ -6,7 +6,7 @@
 // Provide the RTDB payload printing info and other helper functions.
 #include "addons/RTDBHelper.h"
 
-#define capteur 4 // GPIO 4 on ESP32, used for analog input
+#define capteur 19 // GPIO 4 on ESP32, used for analog input
 int threshold = 400; // Adjust this value based on the noise level in your environment
 unsigned long lastMovementTime = 0; // Variable to store the time of the last movement detection
 unsigned long sleepingDelay = 3000; // Delay in milliseconds before considering the baby is sleeping
