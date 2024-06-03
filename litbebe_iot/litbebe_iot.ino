@@ -8,8 +8,8 @@
 #include "addons/RTDBHelper.h"
 
 // WiFi Credentials
-#define WIFI_SSID "Redmi Note 13"
-#define WIFI_PASSWORD "1234567899"
+#define WIFI_SSID "Redmi Note 9 Pro"
+#define WIFI_PASSWORD "1231231230"
 
 // Firebase Configuration
 #define API_KEY "AIzaSyCiWthdW9oA6TIm1vBJSCq83Q4IKRGdm7E"
@@ -81,7 +81,7 @@ void setup() {
   } else {
     Serial.printf("%s\n", config.signer.signupError.message.c_str());
   }
-  //config.token_status_callback = tokenStatusCallback; // see addons/TokenHelper.h
+
   Firebase.begin(&config, &auth);
   Firebase.reconnectWiFi(true);
 
@@ -91,7 +91,7 @@ void setup() {
 
 void loop() {
   temperatureHumiditySensor();
-  //rgbSensor();
+  rgbSensor();
   movementSensor();
   soundSensor();
   delay(3000);
@@ -122,22 +122,24 @@ void temperatureHumiditySensor() {
 }
 
 void rgbSensor() {
-  if (Serial.available() > 0) {
+
     String input = Serial.readStringUntil('\n');
     int r, g, b;
+    Serial.print("Inpuuuuuuuuuuuuuuuuuuuut : ");
+    Serial.println(input);
     sscanf(input.c_str(), "%d %d %d", &r, &g, &b);
     setColor(strip.Color(r, g, b));
     Firebase.RTDB.setString(&fbdo, "LED/RGB", input);
-  }
+  
 
   if (Firebase.ready() && signupOK) {
     String rgbValues;
-    if (Firebase.RTDB.getString(&fbdo, "LED/RGB", &rgbValues)) {
+    if (1==1) {
       int r, g, b;
-      sscanf(rgbValues.c_str(), "%d %d %d", &r, &g, &b);
+    sscanf(rgbValues.c_str(), "%d %d %d", &r, &g, &b);
       setColor(strip.Color(r, g, b));
     } else {
-      Serial.println("Failed to get RGB data");
+     Serial.println("Failed to get RGB data");
       Serial.println("REASON: " + fbdo.errorReason());
     }
   }
