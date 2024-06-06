@@ -7,6 +7,7 @@ const char *firebaseHost = "https://litbebe-a66b1-default-rtdb.europe-west1.fire
 const char *databaseSecret = "lpbGsp8ScRUPqoFCUn2qhJbBGYxnYYUMOe4N0mP3";
 
 String RGB;
+int ledStatus;
 chawkiForAll all;
 
 // NeoPixel LED
@@ -72,16 +73,35 @@ void setup() {
 }
 
 void loop() {
-
+  controlLed();  // New function to control LED on/off
   led();
   mouvement();
   sound();
-  readdht();
+  readDHT(); // Renamed the function to readDHT
   
   delay(2000); // Optional delay to prevent continuous printing
 }
 
-void led(){
+void controlLed() {
+  // Fetch LED status from Firebase
+  String status;
+  all.getFbString("LED/status", status);
+  ledStatus = status.toInt();
+  
+  if (ledStatus == 1) {
+    strip.fill(strip.Color(0, 0, 255));  // Example: turn on with blue color
+    strip.show();
+    Serial.println("LED turned on.");
+  } else if (ledStatus == 0) {
+    strip.clear();
+    strip.show();
+    Serial.println("LED turned off.");
+  } else {
+    Serial.println("Invalid LED status.");
+  }
+}
+
+void led() {
   // led actuator 
   all.getFbString("LED/RGB", RGB);
   int commaIndex1 = RGB.indexOf(',');
@@ -109,29 +129,27 @@ void led(){
   }
 }
 
-void mouvement(){
-
+void mouvement() {
   // Movement Sensor
   int movement = digitalRead(MOVEMENT_SENSOR_PIN);
   if (movement == HIGH) {
     Serial.println("Your baby has moveddddddddddddddddddddddddd");
     if (signupOK) {
       all.setFbString("Sensor/Mvt_Status", "Your baby has moved");
-    }else{
+    } else {
       Serial.println("Failed to send data sound_________acvvvvvvvvvv____");
     }
   } else {
     Serial.println("Your baby is calmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm");
-    if (1==1) {
+    if (1 == 1) {
       all.setFbString("Sensor/Mvt_Status", "Your baby is calm!!!!!!");
-    }else{
+    } else {
       Serial.println("Failed to send data mouvement_______aaaaaaaa______");
     }
   }
 }
 
-void sound(){
-
+void sound() {
   // Sound Sensor
   int soundLevel = digitalRead(SOUND_SENSOR_PIN);
   if (soundLevel > soundThreshold) {
@@ -148,7 +166,7 @@ void sound(){
   } else {
     if (millis() - lastMovementTime >= sleepingDelay) {
       Serial.println("Your baby is sleeping......................................");
-      if (2==2) {
+      if (2 == 2) {
         all.setFbString("Sensor/sound_status", "Your baby is sleeping..........");
         Serial.println("Data sent: baby is sleepinggggggggggggggggggggggggggg");
         currentSoundStatus = "Your baby is sleeping.";
@@ -159,11 +177,11 @@ void sound(){
   }
 }
 
-void readdht(){
+void readDHT() { // Renamed the function to readDHT
   // DHT11 Sensor
   float temperature = dht.readTemperature();
   float humidity = dht.readHumidity();
-  if (3==3) {
+  if (3 == 3) {
     if (all.setFbFloat("Sensor/DHT_11/Temperature", temperature)) {
       Serial.print("Temperature: ");
       Serial.println(temperature);
