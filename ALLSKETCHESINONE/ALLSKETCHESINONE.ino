@@ -48,13 +48,14 @@ void setup() {
   Serial.begin(115200);
 
   // wifi
-  all.initWiFi("Galaxy A20s4417", "1234567899");
+  all.initWiFi("TOPNET_UKHT", "darhammouda2027");
   all.connectToWiFi();
   Serial.println("Connected to WiFi!");
 
   // initiate firebase
   all.initFb(firebaseHost,databaseSecret);
   while (!Serial) {
+    signupOK = true;
       ; // Wait for Serial to be ready
   }
   Serial.println("Serial initialized");
@@ -63,8 +64,8 @@ void setup() {
   strip.setBrightness(100);
   strip.fill(strip.Color(0, 0, 255));  // Red color for testing
   strip.show();
-  Serial.println("Strip set to red. Setup complete.");
-  Serial.println("Enter RGB values as R,G,B:");
+  //Serial.println("Strip set to red. Setup complete.");
+  //Serial.println("Enter RGB values as R,G,B:");
 
   // Initialize lastMovementTime to current time
   lastMovementTime = millis();
@@ -72,8 +73,17 @@ void setup() {
 
 void loop() {
 
+  led();
+  mouvement();
+  sound();
+  readdht();
+  
+  delay(2000); // Optional delay to prevent continuous printing
+}
+
+void led(){
   // led actuator 
-  all.getFbString("Actuator/LED/RGB", RGB);
+  all.getFbString("LED/RGB", RGB);
   int commaIndex1 = RGB.indexOf(',');
   int commaIndex2 = RGB.lastIndexOf(',');
 
@@ -85,64 +95,76 @@ void loop() {
       if (r >= 0 && r <= 255 && g >= 0 && g <= 255 && b >= 0 && b <= 255) {
           strip.fill(strip.Color(r, g, b));
           strip.show();
-          Serial.print("Updated color to: R=");
-          Serial.print(r);
-          Serial.print(", G=");
-          Serial.print(g);
-          Serial.print(", B=");
-          Serial.println(b);
+          //Serial.print("Updated color to: R=");
+          //Serial.print(r);
+          //Serial.print(", G=");
+          //Serial.print(g);
+          //Serial.print(", B=");
+          //Serial.println(b);
       } else {
           Serial.println("Invalid input. RGB values must be between 0 and 255.");
       }
   } else {
       Serial.println("Invalid input format. Use R,G,B format.");
   }
+}
 
-  // Sound Sensor
-  int soundLevel = digitalRead(SOUND_SENSOR_PIN);
-  if (soundLevel > soundThreshold) {
-    Serial.println("Your baby has woken up!");
-    lastMovementTime = millis();
-
-    if (Firebase.ready() && signupOK && currentSoundStatus != "Your baby has woken up!") {
-      all.setFbString("Sensor/sound_status", "Your baby has woken up!");
-      Serial.println("Data sent: baby is awake");
-      currentSoundStatus = "Your baby has woken up!";
-    } else {
-      Serial.println("Failed to send data");
-    }
-  } else {
-    if (millis() - lastMovementTime >= sleepingDelay) {
-      Serial.println("Your baby is sleeping.");
-      if (Firebase.ready() && signupOK && currentSoundStatus != "Your baby is sleeping.") {
-        all.setFbString("Sensor/sound_status", "Your baby is sleeping.");
-        Serial.println("Data sent: baby is sleeping");
-        currentSoundStatus = "Your baby is sleeping.";
-      } else {
-        Serial.println("Failed to send data");
-      }
-    }
-  }
+void mouvement(){
 
   // Movement Sensor
   int movement = digitalRead(MOVEMENT_SENSOR_PIN);
   if (movement == HIGH) {
-    Serial.println("Your baby has moved");
-    if (Firebase.ready() && signupOK) {
+    Serial.println("Your baby has moveddddddddddddddddddddddddd");
+    if (signupOK) {
       all.setFbString("Sensor/Mvt_Status", "Your baby has moved");
+    }else{
+      Serial.println("Failed to send data sound_________acvvvvvvvvvv____");
     }
   } else {
-    Serial.println("Your baby is calm");
-    if (Firebase.ready() && signupOK) {
-      all.setFbString("Sensor/Mvt_Status", "Your baby is calm");
+    Serial.println("Your baby is calmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm");
+    if (1==1) {
+      all.setFbString("Sensor/Mvt_Status", "Your baby is calm!!!!!!");
+    }else{
+      Serial.println("Failed to send data mouvement_______aaaaaaaa______");
     }
   }
+}
 
+void sound(){
+
+  // Sound Sensor
+  int soundLevel = digitalRead(SOUND_SENSOR_PIN);
+  if (soundLevel > soundThreshold) {
+    Serial.println("Your baby has woken up!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+    lastMovementTime = millis();
+
+    if (signupOK && currentSoundStatus != "Your baby has woken up!") {
+      all.setFbString("Sensor/sound_status", "Your baby has woken up!");
+      Serial.println("Data sent: baby is awake");
+      currentSoundStatus = "Your baby has woken up!";
+    } else {
+      Serial.println("Failed to send data sound_____________");
+    }
+  } else {
+    if (millis() - lastMovementTime >= sleepingDelay) {
+      Serial.println("Your baby is sleeping......................................");
+      if (2==2) {
+        all.setFbString("Sensor/sound_status", "Your baby is sleeping..........");
+        Serial.println("Data sent: baby is sleepinggggggggggggggggggggggggggg");
+        currentSoundStatus = "Your baby is sleeping.";
+      } else {
+        Serial.println("Failed to send data soundddddddddddddddddddddddd");
+      }
+    }
+  }
+}
+
+void readdht(){
   // DHT11 Sensor
   float temperature = dht.readTemperature();
   float humidity = dht.readHumidity();
-  if (Firebase.ready() && signupOK) {
-    if (all.setFbInt("Sensor/DHT_11/Temperature", temperature)) {
+  if (3==3) {
+    if (all.setFbFloat("Sensor/DHT_11/Temperature", temperature)) {
       Serial.print("Temperature: ");
       Serial.println(temperature);
     } else {
@@ -155,6 +177,4 @@ void loop() {
       Serial.println("Failed to send humidity data");
     }
   }
-
-  delay(500); // Optional delay to prevent continuous printing
 }
