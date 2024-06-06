@@ -56,8 +56,7 @@ void setup() {
   // initiate firebase
   all.initFb(firebaseHost,databaseSecret);
   while (!Serial) {
-    signupOK = true;
-      ; // Wait for Serial to be ready
+    ; // Wait for Serial to be ready
   }
   Serial.println("Serial initialized");
   strip.begin();
@@ -73,7 +72,6 @@ void setup() {
 }
 
 void loop() {
-  controlLed();  // New function to control LED on/off
   led();
   mouvement();
   sound();
@@ -82,50 +80,42 @@ void loop() {
   delay(2000); // Optional delay to prevent continuous printing
 }
 
-void controlLed() {
-  // Fetch LED status from Firebase
-  String status;
-  all.getFbString("LED/status", status);
-  ledStatus = status.toInt();
-  
-  if (ledStatus == 1) {
-    strip.fill(strip.Color(0, 0, 255));  // Example: turn on with blue color
-    strip.show();
-    Serial.println("LED turned on.");
-  } else if (ledStatus == 0) {
-    strip.clear();
-    strip.show();
-    Serial.println("LED turned off.");
-  } else {
-    Serial.println("Invalid LED status.");
-  }
-}
-
 void led() {
   // led actuator 
   all.getFbString("LED/RGB", RGB);
   int commaIndex1 = RGB.indexOf(',');
   int commaIndex2 = RGB.lastIndexOf(',');
 
-  if (commaIndex1 > 0 && commaIndex2 > commaIndex1) {
-      int r = RGB.substring(0, commaIndex1).toInt();
-      int g = RGB.substring(commaIndex1 + 1, commaIndex2).toInt();
-      int b = RGB.substring(commaIndex2 + 1).toInt();
+  String status;
+  all.getFbString("LED/status", status);
+  ledStatus = status.toInt();
+  if (ledStatus == 1) {
+    if (commaIndex1 > 0 && commaIndex2 > commaIndex1) {
+        int r = RGB.substring(0, commaIndex1).toInt();
+        int g = RGB.substring(commaIndex1 + 1, commaIndex2).toInt();
+        int b = RGB.substring(commaIndex2 + 1).toInt();
 
-      if (r >= 0 && r <= 255 && g >= 0 && g <= 255 && b >= 0 && b <= 255) {
-          strip.fill(strip.Color(r, g, b));
-          strip.show();
-          //Serial.print("Updated color to: R=");
-          //Serial.print(r);
-          //Serial.print(", G=");
-          //Serial.print(g);
-          //Serial.print(", B=");
-          //Serial.println(b);
-      } else {
-          Serial.println("Invalid input. RGB values must be between 0 and 255.");
-      }
+        if (r >= 0 && r <= 255 && g >= 0 && g <= 255 && b >= 0 && b <= 255) {
+            strip.fill(strip.Color(r, g, b));
+            strip.show();
+            //Serial.print("Updated color to: R=");
+            //Serial.print(r);
+            //Serial.print(", G=");
+            //Serial.print(g);
+            //Serial.print(", B=");
+            //Serial.println(b);
+        } else {
+            Serial.println("Invalid input. RGB values must be between 0 and 255.");
+        }
+    } else {
+        Serial.println("Invalid input format. Use R,G,B format.");
+    }
+  }else if (ledStatus == 0) {
+    strip.clear();
+    strip.show();
+    Serial.println("LED turned off.");
   } else {
-      Serial.println("Invalid input format. Use R,G,B format.");
+    Serial.println("Invalid LED status.");
   }
 }
 
