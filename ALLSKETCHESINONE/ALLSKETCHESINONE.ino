@@ -1,6 +1,7 @@
 #include <chawkiForAll.h>
 #include <DHT.h>
 #include <Adafruit_NeoPixel.h>
+#include <Servo.h>  // Include the Servo library
 
 // Firebase Configuration
 const char *firebaseHost = "https://litbebe-a66b1-default-rtdb.europe-west1.firebasedatabase.app/";
@@ -37,6 +38,11 @@ FirebaseConfig config;
 
 bool signupOK = false;
 
+// Servo Motor
+Servo swingServo;
+#define SWING_SERVO_PIN 18
+String swingStatus;
+
 void tokenStatusCallback(TokenInfo info) {
   Serial.printf("Token Info: type = %d, status = %d\n", info.type, info.status);
 }
@@ -64,11 +70,12 @@ void setup() {
   strip.setBrightness(100);
   strip.fill(strip.Color(0, 0, 255));  // Red color for testing
   strip.show();
-  //Serial.println("Strip set to red. Setup complete.");
-  //Serial.println("Enter RGB values as R,G,B:");
 
   // Initialize lastMovementTime to current time
   lastMovementTime = millis();
+  
+  // Initialize servo motor
+  swingServo.attach(SWING_SERVO_PIN);
 }
 
 void loop() {
@@ -76,6 +83,7 @@ void loop() {
   mouvement();
   sound();
   readDHT(); // Renamed the function to readDHT
+  controlServo(); // Add this function call to control the servo
   
   delay(2000); // Optional delay to prevent continuous printing
 }
@@ -184,5 +192,36 @@ void readDHT() { // Renamed the function to readDHT
     } else {
       Serial.println("Failed to send humidity data");
     }
+  }
+}
+
+void controlServo() {
+  all.getFbString("swing", swingStatus);
+  int swingPosition = swingStatus.toInt();
+  if (swingPosition == 1) {
+    // Move to position 0 degrees (simulating -90 degrees)
+    swingServo.write(0);
+    Serial.println("Swing Servo moved to 0 degrees (simulating -90 degrees).");
+    delay(1000); // Wait for 1 second
+    
+    // Move to position 90 degrees (simulating 0 degrees)
+    swingServo.write(90);
+    Serial.println("Swing Servo moved to 90 degrees (simulating 0 degrees).");
+    delay(1000); // Wait for 1 second
+
+    // Move to position 180 degrees (simulating 90 degrees)
+    swingServo.write(180);
+    Serial.println("Swing Servo moved to 180 degrees (simulating 90 degrees).");
+    delay(1000); // Wait for 1 second
+
+    // Move back to position 90 degrees (simulating 0 degrees)
+    swingServo.write(90);
+    Serial.println("Swing Servo moved back to 90 degrees (simulating 0 degrees).");
+    delay(1000); // Wait for 1 second
+  } else if (swingPosition == 0) {
+    swingServo.write(0);   // Turn the servo off to 0 degrees
+    Serial.println("Swing Servo turned off.");
+  } else {
+    Serial.println("Invalid swing status.");
   }
 }
