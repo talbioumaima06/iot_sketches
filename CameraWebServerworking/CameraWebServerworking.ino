@@ -1,6 +1,7 @@
 #include "esp_camera.h"
 #include <chawkiForAll.h>
 #include "arduino_base64.hpp"
+#include <HTTPClient.h>
 
 // Select camera model
 #define CAMERA_MODEL_AI_THINKER // Has PSRAM
@@ -111,6 +112,52 @@ void loop() {
 }
 
 void takeAndUploadPicture() {
+  Serial.println("Taking picture...");
+  camera_fb_t *fb = esp_camera_fb_get();
+  if (!fb) {
+    Serial.println("Camera capture failed");
+    return;
+  }
+
+  // Encode the image to base64
+  size_t encodedSize = base64::encodeLength(fb->len);
+  char* base64Buffer = new char[encodedSize];
+  base64::encode(fb->buf, fb->len, base64Buffer);
+
+  // Convert the encoded base64 buffer to a String
+  String base64Image = String(base64Buffer);
+
+  // Send POST request to server with base64 image data
+  HTTPClient http;
+  http.begin("http://192.168.1.17:3000/upload"); // Replace "your_server" with your server address
+  http.addHeader("Content-Type", "application/json");
+
+  // Prepare the JSON payload
+  String jsonPayload = "{\"image\": \"" + base64Image + "\"}";
+
+  // Send POST request with JSON payload
+  int httpResponseCode = http.POST(jsonPayload);
+
+  if (httpResponseCode > 0) {
+    Serial.print("HTTP Response code: ");
+    Serial.println(httpResponseCode);
+    String response = http.getString();
+    Serial.println(response);
+  } else {
+    Serial.print("Error in HTTP POST request: ");
+    Serial.println(httpResponseCode);
+    Serial.print("Error detail: ");
+    Serial.println(http.errorToString(httpResponseCode).c_str());
+  }
+
+  // End HTTP connection
+  http.end();
+
+  // Return the frame buffer to the camera library
+  esp_camera_fb_return(fb);
+}
+
+void __takeAndUploadPicture() {
   Serial.println("Taking picture...");
   camera_fb_t *fb = esp_camera_fb_get();
   if (!fb) {
