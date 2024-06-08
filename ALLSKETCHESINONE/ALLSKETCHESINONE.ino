@@ -236,7 +236,7 @@ void readDHT() { // Renamed the function to readDHT
 }
 
 void controlServo() {
-  all.getFbString("swing", swingStatus);
+  all.getFbString("Swings", swingStatus);
   int swingPosition = swingStatus.toInt();
   if (swingPosition == 1) {
     // Move to position 0 degrees (simulating -90 degrees)

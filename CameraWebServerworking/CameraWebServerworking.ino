@@ -2,40 +2,11 @@
 #include <chawkiForAll.h>
 #include "arduino_base64.hpp"
 
-//
-// WARNING!!! PSRAM IC required for UXGA resolution and high JPEG quality
-//            Ensure ESP32 Wrover Module or other board with PSRAM is selected
-//            Partial images will be transmitted if image exceeds buffer size
-//
-//            You must select partition scheme from the board menu that has at least 3MB APP space.
-//            Face Recognition is DISABLED for ESP32 and ESP32-S2, because it takes up from 15 
-//            seconds to process single frame. Face Detection is ENABLED if PSRAM is enabled as well
-
-// ===================
 // Select camera model
-// ===================
-//#define CAMERA_MODEL_WROVER_KIT // Has PSRAM
-//#define CAMERA_MODEL_ESP_EYE // Has PSRAM
-//#define CAMERA_MODEL_ESP32S3_EYE // Has PSRAM
-//#define CAMERA_MODEL_M5STACK_PSRAM // Has PSRAM
-//#define CAMERA_MODEL_M5STACK_V2_PSRAM // M5Camera version B Has PSRAM
-//#define CAMERA_MODEL_M5STACK_WIDE // Has PSRAM
-//#define CAMERA_MODEL_M5STACK_ESP32CAM // No PSRAM
-//#define CAMERA_MODEL_M5STACK_UNITCAM // No PSRAM
 #define CAMERA_MODEL_AI_THINKER // Has PSRAM
-//#define CAMERA_MODEL_TTGO_T_JOURNAL // No PSRAM
-//#define CAMERA_MODEL_XIAO_ESP32S3 // Has PSRAM
-// ** Espressif Internal Boards **
-//#define CAMERA_MODEL_ESP32_CAM_BOARD
-//#define CAMERA_MODEL_ESP32S2_CAM_BOARD
-//#define CAMERA_MODEL_ESP32S3_CAM_LCD
-//#define CAMERA_MODEL_DFRobot_FireBeetle2_ESP32S3 // Has PSRAM
-//#define CAMERA_MODEL_DFRobot_Romeo_ESP32S3 // Has PSRAM
 #include "camera_pins.h"
 
-// ===========================
-// Enter your WiFi credentials
-// ===========================
+// WiFi credentials
 const char* ssid = "TOPNET_UKHT";
 const char* password = "darhammouda2027";
 
@@ -50,7 +21,7 @@ void startCameraServer();
 void setupLedFlash(int pin);
 
 unsigned long previousMillis = 0;
-const long interval = 300000;  // Interval in milliseconds (5 minutes)
+const long interval = 10000;  // Interval in milliseconds 300000(5 minutes) ... 10000(10 sec)
 
 void setup() {
   Serial.begin(115200);
@@ -77,40 +48,23 @@ void setup() {
   config.pin_pwdn = PWDN_GPIO_NUM;
   config.pin_reset = RESET_GPIO_NUM;
   config.xclk_freq_hz = 20000000;
-  config.frame_size = FRAMESIZE_UXGA;
-  config.pixel_format = PIXFORMAT_JPEG; // for streaming
-  //config.pixel_format = PIXFORMAT_RGB565; // for face detection/recognition
-  config.grab_mode = CAMERA_GRAB_WHEN_EMPTY;
-  config.fb_location = CAMERA_FB_IN_PSRAM;
-  config.jpeg_quality = 12;
-  config.fb_count = 1;
+  config.pixel_format = PIXFORMAT_JPEG;
   
-  // if PSRAM IC present, init with UXGA resolution and higher JPEG quality
-  //                      for larger pre-allocated frame buffer.
-  if(config.pixel_format == PIXFORMAT_JPEG){
-    if(psramFound()){
-      config.jpeg_quality = 10;
-      config.fb_count = 2;
-      config.grab_mode = CAMERA_GRAB_LATEST;
-    } else {
-      // Limit the frame size when PSRAM is not available
-      config.frame_size = FRAMESIZE_SVGA;
-      config.fb_location = CAMERA_FB_IN_DRAM;
-    }
-  } else {
-    // Best option for face detection/recognition
-    config.frame_size = FRAMESIZE_240X240;
-#if CONFIG_IDF_TARGET_ESP32S3
+  // Use higher resolution and better JPEG quality if PSRAM is available
+  if(psramFound()){
+    config.frame_size = FRAMESIZE_UXGA; // or FRAMESIZE_HD
+    config.jpeg_quality = 10; // Lower number means higher quality
     config.fb_count = 2;
-#endif
+    config.grab_mode = CAMERA_GRAB_LATEST;
+    config.fb_location = CAMERA_FB_IN_PSRAM;
+  } else {
+    // Limit the frame size when PSRAM is not available
+    config.frame_size = FRAMESIZE_SVGA;
+    config.jpeg_quality = 12;
+    config.fb_location = CAMERA_FB_IN_DRAM;
   }
 
-#if defined(CAMERA_MODEL_ESP_EYE)
-  pinMode(13, INPUT_PULLUP);
-  pinMode(14, INPUT_PULLUP);
-#endif
-
-  // camera init
+  // Camera initialization
   esp_err_t err = esp_camera_init(&config);
   if (err != ESP_OK) {
     Serial.printf("Camera init failed with error 0x%x", err);
@@ -118,36 +72,18 @@ void setup() {
   }
 
   sensor_t * s = esp_camera_sensor_get();
-  // initial sensors are flipped vertically and colors are a bit saturated
   if (s->id.PID == OV3660_PID) {
-    s->set_vflip(s, 1); // flip it back
-    s->set_brightness(s, 1); // up the brightness just a bit
-    s->set_saturation(s, -2); // lower the saturation
-  }
-  // drop down frame size for higher initial frame rate
-  if(config.pixel_format == PIXFORMAT_JPEG){
-    s->set_framesize(s, FRAMESIZE_QVGA);
+    s->set_vflip(s, 1);
+    s->set_brightness(s, 1);
+    s->set_saturation(s, -2);
   }
 
-#if defined(CAMERA_MODEL_M5STACK_WIDE) || defined(CAMERA_MODEL_M5STACK_ESP32CAM)
-  s->set_vflip(s, 1);
-  s->set_hmirror(s, 1);
-#endif
-
-#if defined(CAMERA_MODEL_ESP32S3_EYE)
-  s->set_vflip(s, 1);
-#endif
-
-// Setup LED FLash if LED pin is defined in camera_pins.h
-#if defined(LED_GPIO_NUM)
-  setupLedFlash(LED_GPIO_NUM);
-#endif
-
-  all.initWiFi("TOPNET_UKHT", "darhammouda2027");
+  all.initWiFi(ssid, password);
   all.connectToWiFi();
   Serial.println("Connected to WiFi!");
-  // initiate firebase
-  all.initFb(firebaseHost,databaseSecret);
+
+  // Initiate Firebase
+  all.initFb(firebaseHost, databaseSecret);
   while (!Serial) {
     ; // Wait for Serial to be ready
   }
@@ -157,7 +93,7 @@ void setup() {
   Serial.print("Camera Ready! Use 'http://");
   Serial.print(WiFi.localIP());
   String url = "http://" + WiFi.localIP().toString();
-  all.setFbString("/url_streaming", url.c_str());
+  all.setFbString("/camera/url_streaming", url.c_str());
   Serial.println("' to connect");
 }
 
@@ -165,42 +101,36 @@ void loop() {
   unsigned long currentMillis = millis();
 
   if (currentMillis - previousMillis >= interval) {
-    // Save the last time a picture was taken
     previousMillis = currentMillis;
-
-    // Take and upload the picture every 5 minutes
     takeAndUploadPicture();
   }
-    takeAndUploadPicture();
+  takeAndUploadPicture();
 
   // Do nothing. Everything is done in another task by the web server
   delay(10000);
 }
 
 void takeAndUploadPicture() {
-      Serial.println("heloooooooooooo");
-    // Take a picture
-    camera_fb_t *fb = NULL;
-    fb = esp_camera_fb_get();
-    if (!fb) {
-        Serial.println("Camera capture failed");
-        return;
-    }
+  Serial.println("Taking picture...");
+  camera_fb_t *fb = esp_camera_fb_get();
+  if (!fb) {
+    Serial.println("Camera capture failed");
+    return;
+  }
 
-   
-   // Encode the image to base64
-    size_t encodedSize = base64::encodeLength(fb->len);
-    char* base64Buffer = new char[encodedSize];
-    base64::encode(fb->buf, fb->len, base64Buffer);
+  // Encode the image to base64
+  size_t encodedSize = base64::encodeLength(fb->len);
+  char* base64Buffer = new char[encodedSize];
+  base64::encode(fb->buf, fb->len, base64Buffer);
 
-    // Convert the encoded base64 buffer to a String
-    String base64Image = String(base64Buffer);
-   
+  // Convert the encoded base64 buffer to a String
+  String base64Image = String(base64Buffer);
+  Serial.println(base64Image);
 
-    // Upload the base64 encoded image to Firebase Realtime Database
-    all.setFbString("/base64_image", base64Image.c_str());
-    Serial.println("Base64 image uploaded to Firebase Realtime Database");
+  // Upload the base64 encoded image to Firebase Realtime Database
+  all.setFbString("/camera/base64_image", base64Image.c_str());
+  Serial.println("Base64 image uploaded to Firebase Realtime Database");
 
-    // Return the frame buffer to the camera library
-    esp_camera_fb_return(fb);
+  // Return the frame buffer to the camera library
+  esp_camera_fb_return(fb);
 }
