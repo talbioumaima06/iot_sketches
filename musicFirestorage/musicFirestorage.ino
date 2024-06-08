@@ -1,7 +1,6 @@
 #include <FirebaseESP32.h>
 #include <WiFi.h>
 #include <HTTPClient.h>
-#include "SD.h"
 #include "FS.h"
 
 // Wi-Fi credentials
@@ -11,7 +10,7 @@ const char* password = "darhammouda2027";
 // Firebase configuration
 const char *firebaseHost = "https://litbebe-a66b1-default-rtdb.europe-west1.firebasedatabase.app/";
 const char *databaseSecret = "lpbGsp8ScRUPqoFCUn2qhJbBGYxnYYUMOe4N0mP3";
-const char *storageBucket = "gs://litbebe-a66b1.appspot.com";
+const char *storageBucket = "litbebe-a66b1.appspot.com";
 
 // Firebase Data objects
 FirebaseData fbdo;
@@ -45,11 +44,11 @@ void setup() {
   Serial.println("Firebase initialized");
 
   // Initialize PWM pin for audio output
-  ledcSetup(0, 1000, 8); // channel 0, frequency 1000Hz, resolution 8-bit
+  ledcSetup(0, 44100, 8); // channel 0, frequency 44100Hz (standard audio sampling rate), resolution 8-bit
   ledcAttachPin(AUDIO_PIN, 0);
 
   // Read and play the audio file from Firebase Storage
-  readFileFromStorage("/music.wav");
+  readFileFromStorage("music.wav");
 }
 
 void loop() {
@@ -66,7 +65,8 @@ void readFileFromStorage(const char* filePath) {
 
   int httpCode = http.GET();
   if (httpCode > 0) {
-    if (httpCode > 0) {
+      Serial.println(httpCode);
+    if (httpCode == HTTP_CODE_OK) {
       WiFiClient *stream = http.getStreamPtr();
       uint8_t buffer[512];
       int len = 0;
@@ -75,7 +75,7 @@ void readFileFromStorage(const char* filePath) {
         int c = stream->readBytes(buffer, min(len, (int)sizeof(buffer)));
         for (int i = 0; i < c; i++) {
           ledcWrite(0, buffer[i]);
-          delay(5); // Adjust this delay for playback speed
+          delayMicroseconds(22); // Adjust this delay based on sampling rate (e.g., 1 second / 44100 samples = ~22.7 microseconds)
         }
       }
 
