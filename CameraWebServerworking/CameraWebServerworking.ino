@@ -1,5 +1,6 @@
 #include "esp_camera.h"
 #include <chawkiForAll.h>
+#include "arduino_base64.hpp"
 
 //
 // WARNING!!! PSRAM IC required for UXGA resolution and high JPEG quality
@@ -47,6 +48,9 @@ chawkiForAll all;
 
 void startCameraServer();
 void setupLedFlash(int pin);
+
+unsigned long previousMillis = 0;
+const long interval = 300000;  // Interval in milliseconds (5 minutes)
 
 void setup() {
   Serial.begin(115200);
@@ -158,12 +162,23 @@ void setup() {
 }
 
 void loop() {
+  unsigned long currentMillis = millis();
+
+  if (currentMillis - previousMillis >= interval) {
+    // Save the last time a picture was taken
+    previousMillis = currentMillis;
+
+    // Take and upload the picture every 5 minutes
+    takeAndUploadPicture();
+  }
+    takeAndUploadPicture();
+
   // Do nothing. Everything is done in another task by the web server
   delay(10000);
 }
 
-
 void takeAndUploadPicture() {
+      Serial.println("heloooooooooooo");
     // Take a picture
     camera_fb_t *fb = NULL;
     fb = esp_camera_fb_get();
@@ -172,14 +187,19 @@ void takeAndUploadPicture() {
         return;
     }
 
-    // Upload the picture to Firebase Storage
-    String picturePath = "/pictures/pic" + String(millis()) + ".jpg"; // Generate a unique picture path
-    bool success = all.uploadFile(storageBucket, picturePath.c_str(), fb->buf, fb->len);
-    if (success) {
-        Serial.println("Picture uploaded successfully: " + picturePath);
-    } else {
-        Serial.println("Failed to upload picture");
-    }
+   
+   // Encode the image to base64
+    size_t encodedSize = base64::encodeLength(fb->len);
+    char* base64Buffer = new char[encodedSize];
+    base64::encode(fb->buf, fb->len, base64Buffer);
+
+    // Convert the encoded base64 buffer to a String
+    String base64Image = String(base64Buffer);
+   
+
+    // Upload the base64 encoded image to Firebase Realtime Database
+    all.setFbString("/base64_image", base64Image.c_str());
+    Serial.println("Base64 image uploaded to Firebase Realtime Database");
 
     // Return the frame buffer to the camera library
     esp_camera_fb_return(fb);
