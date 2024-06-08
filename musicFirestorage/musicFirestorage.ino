@@ -20,6 +20,10 @@ FirebaseConfig config;
 // Define the GPIO pin for PWM audio output
 #define AUDIO_PIN 2  // Example: Use GPIO2 for PWM output
 
+#define BUFFER_SIZE 512 // Buffer size for audio data
+uint8_t buffer[BUFFER_SIZE];
+int bufferIndex = 0;
+
 void setup() {
   Serial.begin(115200);
 
@@ -65,18 +69,33 @@ void readFileFromStorage(const char* filePath) {
 
   int httpCode = http.GET();
   if (httpCode > 0) {
-      Serial.println(httpCode);
+    Serial.println(httpCode);
     if (httpCode == HTTP_CODE_OK) {
       WiFiClient *stream = http.getStreamPtr();
-      uint8_t buffer[512];
       int len = 0;
 
       while (http.connected() && (len = stream->available()) > 0) {
-        int c = stream->readBytes(buffer, min(len, (int)sizeof(buffer)));
-        for (int i = 0; i < c; i++) {
-          ledcWrite(0, buffer[i]);
-          delayMicroseconds(22); // Adjust this delay based on sampling rate (e.g., 1 second / 44100 samples = ~22.7 microseconds)
+        int bytesRead = stream->readBytes(buffer + bufferIndex, min(len, BUFFER_SIZE - bufferIndex));
+        bufferIndex += bytesRead;
+
+        // If the buffer is full or the end of the file is reached
+        if (bufferIndex >= BUFFER_SIZE || len == 0) {
+          // Write buffered data to PWM output
+          for (int i = 0; i < bufferIndex; i++) {
+            ledcWrite(0, buffer[i]);
+            delayMicroseconds(23); // Adjusted delay for 44.1kHz sample rate
+          }
+          bufferIndex = 0; // Reset buffer index
         }
+      }
+
+      // Handle any remaining data in the buffer
+      if (bufferIndex > 0) {
+        for (int i = 0; i < bufferIndex; i++) {
+          ledcWrite(0, buffer[i]);
+          delayMicroseconds(23); // Adjusted delay for 44.1kHz sample rate
+        }
+        bufferIndex = 0; // Reset buffer index
       }
 
       Serial.println("Finished playing audio");
