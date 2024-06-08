@@ -3,9 +3,14 @@
 #include <Adafruit_NeoPixel.h>
 #include <Servo.h>  // Include the Servo library
 
+#include <HTTPClient.h>
+#include "FS.h"
+#include "driver/i2s.h"
+
 // Firebase Configuration
 const char *firebaseHost = "https://litbebe-a66b1-default-rtdb.europe-west1.firebasedatabase.app/";
 const char *databaseSecret = "lpbGsp8ScRUPqoFCUn2qhJbBGYxnYYUMOe4N0mP3";
+const char *storageBucket = "litbebe-a66b1.appspot.com";
 
 String RGB;
 int ledStatus;
@@ -15,6 +20,14 @@ chawkiForAll all;
 #define LED_PIN 4
 #define NUMPIXELS 15
 Adafruit_NeoPixel strip(NUMPIXELS, LED_PIN, NEO_GRB + NEO_KHZ800);
+
+//speaker
+#define SAMPLE_RATE 44100
+#define BITS_PER_SAMPLE 16
+#define CHANNELS 2
+#define AUDIO_BUFFER_SIZE 1024
+#define I2S_PIN_OUT 25 // Define the GPIO pin for I2S audio output
+uint8_t buffer[AUDIO_BUFFER_SIZE]; // Define the audio buffer
 
 // Sound Sensor
 #define SOUND_SENSOR_PIN 5
@@ -74,8 +87,35 @@ void setup() {
   // Initialize lastMovementTime to current time
   lastMovementTime = millis();
   
+
+  //Speaker
   // Initialize servo motor
   swingServo.attach(SWING_SERVO_PIN);
+   // Configure I2S
+  i2s_config_t i2s_config = {
+      .mode = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_TX),
+      .sample_rate = SAMPLE_RATE,
+      .bits_per_sample = (i2s_bits_per_sample_t)BITS_PER_SAMPLE,
+      .channel_format = I2S_CHANNEL_FMT_RIGHT_LEFT,
+      .communication_format = (i2s_comm_format_t)(I2S_COMM_FORMAT_I2S | I2S_COMM_FORMAT_I2S_MSB),
+      .intr_alloc_flags = ESP_INTR_FLAG_LEVEL1,
+      .dma_buf_count = 2,
+      .dma_buf_len = AUDIO_BUFFER_SIZE,
+      .use_apll = false,
+      .tx_desc_auto_clear = true,
+      .fixed_mclk = 0};
+  i2s_pin_config_t pin_config = {
+      .bck_io_num = -1,  // Not used (output)
+      .ws_io_num = -1,   // Not used (output)
+      .data_out_num = I2S_PIN_OUT, // Set the GPIO pin for I2S audio output
+      .data_in_num = -1   // Not used (output)
+  };
+  i2s_driver_install(I2S_NUM_0, &i2s_config, 0, NULL);
+  i2s_set_pin(I2S_NUM_0, &pin_config);
+  i2s_zero_dma_buffer(I2S_NUM_0);
+  // Read and play the audio file from Firebase Storage
+  readFileFromStorage("music.wav");
+
 }
 
 void loop() {
@@ -224,4 +264,34 @@ void controlServo() {
   } else {
     Serial.println("Invalid swing status.");
   }
+}
+
+
+void readFileFromStorage(const char* filePath) {
+  Serial.print("Reading file: ");
+  Serial.println(filePath);
+
+  HTTPClient http;
+  String url = String("https://firebasestorage.googleapis.com/v0/b/") + storageBucket + "/o/" + filePath + "?alt=media&token=" + databaseSecret;
+  http.begin(url);
+
+  int httpCode = http.GET();
+  if (httpCode > 0) {
+    Serial.println(httpCode);
+    if (httpCode == HTTP_CODE_OK) {
+      WiFiClient *stream = http.getStreamPtr();
+      size_t bytesRead = 0;
+
+      while (http.connected() && (bytesRead = stream->readBytes(buffer, AUDIO_BUFFER_SIZE)) > 0) {
+        size_t bytesWritten = 0;
+        i2s_write(I2S_NUM_0, buffer, bytesRead, &bytesWritten, portMAX_DELAY);
+      }
+
+      Serial.println("Finished playing audio");
+    }
+  } else {
+    Serial.printf("GET... failed, error: %s\n", http.errorToString(httpCode).c_str());
+  }
+
+  http.end();
 }
