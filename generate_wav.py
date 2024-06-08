@@ -5,12 +5,12 @@ import wave
 sample_rate = 44100  # Sample rate in Hz
 duration = 2 * 60 + 30  # Duration in seconds (2 minutes and 30 seconds)
 frequency = 440.0  # Frequency of the sine wave in Hz (A4 note)
-amplitude = 127  # Amplitude of the sine wave (for 8-bit, the range is 0-255)
+max_amplitude = 255  # Maximum amplitude for 8-bit audio
 
 # Generate the audio data
 num_samples = sample_rate * duration
 t = np.linspace(0, duration, num_samples, False)  # Time array
-waveform = amplitude * (0.5 * np.sin(2 * np.pi * frequency * t) + 0.5)  # Generate sine wave
+waveform = max_amplitude * (0.5 * np.sin(2 * np.pi * frequency * t) + 0.5)  # Generate sine wave
 
 # Ensure the values are in the 8-bit range (0-255)
 waveform = np.clip(waveform, 0, 255).astype(np.uint8)
