@@ -1,5 +1,5 @@
 #include "esp_camera.h"
-#include <WiFi.h>
+#include <chawkiForAll.h>
 
 //
 // WARNING!!! PSRAM IC required for UXGA resolution and high JPEG quality
@@ -37,6 +37,13 @@
 // ===========================
 const char* ssid = "TOPNET_UKHT";
 const char* password = "darhammouda2027";
+
+// Firebase Configuration
+const char *firebaseHost = "https://litbebe-a66b1-default-rtdb.europe-west1.firebasedatabase.app/";
+const char *databaseSecret = "lpbGsp8ScRUPqoFCUn2qhJbBGYxnYYUMOe4N0mP3";
+const char *storageBucket = "litbebe-a66b1.appspot.com";
+
+chawkiForAll all;
 
 void startCameraServer();
 void setupLedFlash(int pin);
@@ -132,24 +139,48 @@ void setup() {
   setupLedFlash(LED_GPIO_NUM);
 #endif
 
-  WiFi.begin(ssid, password);
-  WiFi.setSleep(false);
-
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
+  all.initWiFi("TOPNET_UKHT", "darhammouda2027");
+  all.connectToWiFi();
+  Serial.println("Connected to WiFi!");
+  // initiate firebase
+  all.initFb(firebaseHost,databaseSecret);
+  while (!Serial) {
+    ; // Wait for Serial to be ready
   }
-  Serial.println("");
-  Serial.println("WiFi connected");
 
   startCameraServer();
 
   Serial.print("Camera Ready! Use 'http://");
   Serial.print(WiFi.localIP());
+  String url = "http://" + WiFi.localIP().toString();
+  all.setFbString("/url_streaming", url.c_str());
   Serial.println("' to connect");
 }
 
 void loop() {
   // Do nothing. Everything is done in another task by the web server
   delay(10000);
+}
+
+
+void takeAndUploadPicture() {
+    // Take a picture
+    camera_fb_t *fb = NULL;
+    fb = esp_camera_fb_get();
+    if (!fb) {
+        Serial.println("Camera capture failed");
+        return;
+    }
+
+    // Upload the picture to Firebase Storage
+    String picturePath = "/pictures/pic" + String(millis()) + ".jpg"; // Generate a unique picture path
+    bool success = all.uploadFile(storageBucket, picturePath.c_str(), fb->buf, fb->len);
+    if (success) {
+        Serial.println("Picture uploaded successfully: " + picturePath);
+    } else {
+        Serial.println("Failed to upload picture");
+    }
+
+    // Return the frame buffer to the camera library
+    esp_camera_fb_return(fb);
 }
