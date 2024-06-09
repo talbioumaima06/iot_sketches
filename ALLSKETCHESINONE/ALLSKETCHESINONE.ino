@@ -31,13 +31,9 @@ uint8_t buffer[AUDIO_BUFFER_SIZE]; // Define the audio buffer
 
 // Sound Sensor
 #define SOUND_SENSOR_PIN 5
-int soundThreshold = 400; // Adjust based on your environment
-unsigned long lastMovementTime = 0;
-unsigned long sleepingDelay = 3000;
-String currentSoundStatus = "";
 
 // Movement Sensor
-#define MOVEMENT_SENSOR_PIN 13
+#define MOVEMENT_SENSOR_PIN 23
 
 // DHT11 Sensor
 #define DHT_SENSOR_PIN 21
@@ -88,10 +84,10 @@ void setup() {
   lastMovementTime = millis();
   
 
-  //Speaker
   // Initialize servo motor
   swingServo.attach(SWING_SERVO_PIN);
-   // Configure I2S
+
+  // Configure I2S For Speaker
   i2s_config_t i2s_config = {
       .mode = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_TX),
       .sample_rate = SAMPLE_RATE,
@@ -113,22 +109,63 @@ void setup() {
   i2s_driver_install(I2S_NUM_0, &i2s_config, 0, NULL);
   i2s_set_pin(I2S_NUM_0, &pin_config);
   i2s_zero_dma_buffer(I2S_NUM_0);
-  // Read and play the audio file from Firebase Storage
-  readFileFromStorage("music.wav");
 
+  signupOK = true;
 }
 
 void loop() {
-  led();
-  mouvement();
-  sound();
-  readDHT(); // Renamed the function to readDHT
-  controlServo(); // Add this function call to control the servo
-  
-  delay(2000); // Optional delay to prevent continuous printing
+
+  static unsigned long lastLedTime = 0;
+  static unsigned long lastMovementTime = 0;
+  static unsigned long lastSoundTime = 0;
+  static unsigned long lastDHTTime = 0;
+  static unsigned long lastServoTime = 0;
+
+  unsigned long currentTime = millis();
+  Serial.println("-------------------Loop--------------------------------");
+  Serial.println(currentTime);
+  Serial.println(lastLedTime);
+  Serial.println(lastMovementTime);
+  Serial.println(lastSoundTime);
+  Serial.println(lastDHTTime);
+  Serial.println(lastServoTime);
+  Serial.println("---------------------------------------------------");
+  // Check if it's time to execute the LED function
+  if (currentTime - lastLedTime >= 10000) { // 10 seconds
+    lastLedTime = currentTime;
+    led();
+  }
+
+  // Check if it's time to execute the movement function
+  if (currentTime - lastMovementTime >= 10000) { // 10 seconds
+    lastMovementTime = currentTime;
+    mouvement();
+  }
+
+  // Check if it's time to execute the sound function
+  if (currentTime - lastSoundTime >= 10000) { // 10 seconds
+    lastSoundTime = currentTime;
+    sound();
+  }
+
+  // Check if it's time to execute the DHT function
+  if (currentTime - lastDHTTime >= 5000) { // 5 seconds
+    lastDHTTime = currentTime;
+    readDHT();
+  }
+
+  // Check if it's time to execute the servo function
+  if (currentTime - lastServoTime >= 1000) { // 1 second
+    lastServoTime = currentTime;
+    controlServo();
+  }
+
+  delay(50); // Optional small delay to prevent excessive looping
 }
 
+
 void led() {
+  Serial.println("-------------------LED--------------------------------");
   // led actuator 
   all.getFbString("LED/RGB", RGB);
   int commaIndex1 = RGB.indexOf(',');
@@ -165,61 +202,61 @@ void led() {
   } else {
     Serial.println("Invalid LED status.");
   }
+  Serial.println("---------------------------------------------------");
 }
 
 void mouvement() {
+  Serial.println("-------------------MOUVEMENT--------------------------------");
   // Movement Sensor
   int movement = digitalRead(MOVEMENT_SENSOR_PIN);
+  Serial.println(movement);
   if (movement == HIGH) {
-    Serial.println("Your baby has moveddddddddddddddddddddddddd");
-    if (signupOK) {
-      all.setFbString("Sensor/Mvt_Status", "Your baby has moved");
+    Serial.println("Your baby has moved");
+    if (all.setFbString("Sensor/Mvt_Status", "Your baby has moved")) {
+      Serial.println("Data sent: baby is moving");
     } else {
-      Serial.println("Failed to send data sound_________acvvvvvvvvvv____");
+      Serial.println("Failed to send data sound");
     }
   } else {
-    Serial.println("Your baby is calmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm");
-    if (1 == 1) {
-      all.setFbString("Sensor/Mvt_Status", "Your baby is calm!!!!!!");
+    Serial.println("Your baby is calm");
+    if (all.setFbString("Sensor/Mvt_Status", "Your baby is calm")) {
+      Serial.println("Data sent: baby is calm");
     } else {
-      Serial.println("Failed to send data mouvement_______aaaaaaaa______");
+      Serial.println("Failed to send data mouvement");
     }
   }
+  Serial.println("---------------------------------------------------");
 }
 
 void sound() {
+  Serial.println("-------------------SOUND--------------------------------");
   // Sound Sensor
   int soundLevel = digitalRead(SOUND_SENSOR_PIN);
-  if (soundLevel > soundThreshold) {
-    Serial.println("Your baby has woken up!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-    lastMovementTime = millis();
-
-    if (signupOK && currentSoundStatus != "Your baby has woken up!") {
-      all.setFbString("Sensor/sound_status", "Your baby has woken up!");
+  Serial.println(soundLevel);
+  if (soundLevel == 1) {// there is sound
+    Serial.println("Your baby has woken up!");
+    if (all.setFbString("Sensor/sound_status", "Your baby has woken up!")) {
       Serial.println("Data sent: baby is awake");
-      currentSoundStatus = "Your baby has woken up!";
     } else {
-      Serial.println("Failed to send data sound_____________");
+      Serial.println("No need to send data sound");
     }
   } else {
-    if (millis() - lastMovementTime >= sleepingDelay) {
-      Serial.println("Your baby is sleeping......................................");
-      if (2 == 2) {
-        all.setFbString("Sensor/sound_status", "Your baby is sleeping..........");
-        Serial.println("Data sent: baby is sleepinggggggggggggggggggggggggggg");
-        currentSoundStatus = "Your baby is sleeping.";
-      } else {
-        Serial.println("Failed to send data soundddddddddddddddddddddddd");
-      }
+    Serial.println("Your baby is sleeping");
+    if (all.setFbString("Sensor/sound_status", "Your baby is sleeping.")) {
+      Serial.println("Data sent: baby is sleeping");
+    } else {
+      Serial.println("No need to send data sound");
     }
   }
+  Serial.println("---------------------------------------------------");
 }
 
 void readDHT() { // Renamed the function to readDHT
+  Serial.println("-------------------DHT--------------------------------");
   // DHT11 Sensor
   float temperature = dht.readTemperature();
   float humidity = dht.readHumidity();
-  if (3 == 3) {
+  if (signupOK) {
     if (all.setFbFloat("Sensor/DHT_11/Temperature", temperature)) {
       Serial.print("Temperature: ");
       Serial.println(temperature);
@@ -233,41 +270,62 @@ void readDHT() { // Renamed the function to readDHT
       Serial.println("Failed to send humidity data");
     }
   }
+  Serial.println("---------------------------------------------------");
 }
 
 void controlServo() {
+  Serial.println("-------------------MOTOR--------------------------------");
   all.getFbString("Swings", swingStatus);
   int swingPosition = swingStatus.toInt();
-  if (swingPosition == 1) {
+  if (swingStatus == "true") {
     // Move to position 0 degrees (simulating -90 degrees)
-    swingServo.write(0);
-    Serial.println("Swing Servo moved to 0 degrees (simulating -90 degrees).");
-    delay(1000); // Wait for 1 second
+    //swingServo.write(90);
+    //Serial.println("Swing Servo moved to 0 degrees (simulating -90 degrees).");
+    //delay(500); // Wait for 1 second
     
     // Move to position 90 degrees (simulating 0 degrees)
-    swingServo.write(90);
+    swingServo.write(45);
     Serial.println("Swing Servo moved to 90 degrees (simulating 0 degrees).");
-    delay(1000); // Wait for 1 second
+    delay(500); // Wait for 0.5 second
 
     // Move to position 180 degrees (simulating 90 degrees)
-    swingServo.write(180);
-    Serial.println("Swing Servo moved to 180 degrees (simulating 90 degrees).");
-    delay(1000); // Wait for 1 second
+    //swingServo.write(90);
+    //Serial.println("Swing Servo moved to 180 degrees (simulating 90 degrees).");
+    //delay(500); // Wait for 0.5 second
 
     // Move back to position 90 degrees (simulating 0 degrees)
-    swingServo.write(90);
+    swingServo.write(135);
     Serial.println("Swing Servo moved back to 90 degrees (simulating 0 degrees).");
-    delay(1000); // Wait for 1 second
-  } else if (swingPosition == 0) {
-    swingServo.write(0);   // Turn the servo off to 0 degrees
+    delay(500); // Wait for 0.5 second
+  } else if (swingStatus == "false") {
+    swingServo.write(90);   // Turn the servo off to 0 degrees
     Serial.println("Swing Servo turned off.");
   } else {
     Serial.println("Invalid swing status.");
   }
+  Serial.println("---------------------------------------------------");
 }
 
+// Function to check the real-time database and play the music if needed
+void checkAndPlayMusic() {
+  String playing, current_playing;
+  // Check if music should be playing
+  all.getFbString("/music/playing", playing);
+  
+  if (playing == "1") {
+    // Get the current playing file path
+    all.getFbString("/music/current_playing", current_playing);
+    
+    // Play the file
+    readFileFromStorage(current_playing.c_str());
+    
+    // Once done, set playing back to "0"
+    all.setFbString("/music/playing", "0");
+  }
+}
 
 void readFileFromStorage(const char* filePath) {
+  Serial.println("-------------------read from fire storage--------------------------------");
   Serial.print("Reading file: ");
   Serial.println(filePath);
 
@@ -294,4 +352,5 @@ void readFileFromStorage(const char* filePath) {
   }
 
   http.end();
+  Serial.println("---------------------------------------------------");
 }
