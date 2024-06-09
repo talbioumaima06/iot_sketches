@@ -21,7 +21,7 @@ chawkiForAll all;
 #define NUMPIXELS 15
 Adafruit_NeoPixel strip(NUMPIXELS, LED_PIN, NEO_GRB + NEO_KHZ800);
 
-//speaker
+// Speaker
 #define SAMPLE_RATE 44100
 #define BITS_PER_SAMPLE 16
 #define CHANNELS 2
@@ -56,6 +56,13 @@ void tokenStatusCallback(TokenInfo info) {
   Serial.printf("Token Info: type = %d, status = %d\n", info.type, info.status);
 }
 
+// State variable for music playing
+bool isPlayingMusic = false;
+String currentMusicFile = "";
+WiFiClient *audioStream = nullptr; // Pointer to the audio stream
+HTTPClient http;
+size_t bytesRead = 0;
+
 void setup() {
   // Initialize sensors and actuators
   pinMode(SOUND_SENSOR_PIN, INPUT);
@@ -63,12 +70,12 @@ void setup() {
   dht.begin();
   Serial.begin(115200);
 
-  // wifi
+  // WiFi
   all.initWiFi("TOPNET_UKHT", "darhammouda2027");
   all.connectToWiFi();
   Serial.println("Connected to WiFi!");
 
-  // initiate firebase
+  // Initialize Firebase
   all.initFb(firebaseHost,databaseSecret);
   while (!Serial) {
     ; // Wait for Serial to be ready
@@ -77,17 +84,13 @@ void setup() {
   strip.begin();
   Serial.println("Strip initialized");
   strip.setBrightness(100);
-  strip.fill(strip.Color(0, 0, 255));  // Red color for testing
+  strip.fill(strip.Color(0, 0, 255));  // Blue color for testing
   strip.show();
-
-  // Initialize lastMovementTime to current time
-  lastMovementTime = millis();
-  
 
   // Initialize servo motor
   swingServo.attach(SWING_SERVO_PIN);
 
-  // Configure I2S For Speaker
+  // Configure I2S for Speaker
   i2s_config_t i2s_config = {
       .mode = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_TX),
       .sample_rate = SAMPLE_RATE,
@@ -114,12 +117,12 @@ void setup() {
 }
 
 void loop() {
-
   static unsigned long lastLedTime = 0;
   static unsigned long lastMovementTime = 0;
   static unsigned long lastSoundTime = 0;
   static unsigned long lastDHTTime = 0;
   static unsigned long lastServoTime = 0;
+  static unsigned long lastMusicCheckTime = 0;
 
   unsigned long currentTime = millis();
   Serial.println("-------------------Loop--------------------------------");
@@ -130,6 +133,7 @@ void loop() {
   Serial.println(lastDHTTime);
   Serial.println(lastServoTime);
   Serial.println("---------------------------------------------------");
+
   // Check if it's time to execute the LED function
   if (currentTime - lastLedTime >= 10000) { // 10 seconds
     lastLedTime = currentTime;
@@ -160,13 +164,23 @@ void loop() {
     controlServo();
   }
 
+  // Check if it's time to check for music updates
+  if (currentTime - lastMusicCheckTime >= 1000) { // 1 second
+    lastMusicCheckTime = currentTime;
+    checkAndPlayMusic();
+  }
+
+  // Process audio data if music is playing
+  if (isPlayingMusic) {
+    processMusicChunk();
+  }
+
   delay(50); // Optional small delay to prevent excessive looping
 }
 
-
 void led() {
   Serial.println("-------------------LED--------------------------------");
-  // led actuator 
+  // LED actuator 
   all.getFbString("LED/RGB", RGB);
   int commaIndex1 = RGB.indexOf(',');
   int commaIndex2 = RGB.lastIndexOf(',');
@@ -183,19 +197,13 @@ void led() {
         if (r >= 0 && r <= 255 && g >= 0 && g <= 255 && b >= 0 && b <= 255) {
             strip.fill(strip.Color(r, g, b));
             strip.show();
-            //Serial.print("Updated color to: R=");
-            //Serial.print(r);
-            //Serial.print(", G=");
-            //Serial.print(g);
-            //Serial.print(", B=");
-            //Serial.println(b);
         } else {
             Serial.println("Invalid input. RGB values must be between 0 and 255.");
         }
     } else {
         Serial.println("Invalid input format. Use R,G,B format.");
     }
-  }else if (ledStatus == 0) {
+  } else if (ledStatus == 0) {
     strip.clear();
     strip.show();
     Serial.println("LED turned off.");
@@ -222,7 +230,7 @@ void mouvement() {
     if (all.setFbString("Sensor/Mvt_Status", "Your baby is calm")) {
       Serial.println("Data sent: baby is calm");
     } else {
-      Serial.println("Failed to send data mouvement");
+      Serial.println("Failed to senddata mouvement");
     }
   }
   Serial.println("---------------------------------------------------");
@@ -231,9 +239,8 @@ void mouvement() {
 void sound() {
   Serial.println("-------------------SOUND--------------------------------");
   // Sound Sensor
-  int soundLevel = digitalRead(SOUND_SENSOR_PIN);
-  Serial.println(soundLevel);
-  if (soundLevel == 1) {// there is sound
+  int soundStatus = digitalRead(SOUND_SENSOR_PIN);
+  if (soundStatus == HIGH) {
     Serial.println("Your baby has woken up!");
     if (all.setFbString("Sensor/sound_status", "Your baby has woken up!")) {
       Serial.println("Data sent: baby is awake");
@@ -251,7 +258,7 @@ void sound() {
   Serial.println("---------------------------------------------------");
 }
 
-void readDHT() { // Renamed the function to readDHT
+void readDHT() {
   Serial.println("-------------------DHT--------------------------------");
   // DHT11 Sensor
   float temperature = dht.readTemperature();
@@ -278,24 +285,12 @@ void controlServo() {
   all.getFbString("Swings", swingStatus);
   int swingPosition = swingStatus.toInt();
   if (swingStatus == "true") {
-    // Move to position 0 degrees (simulating -90 degrees)
-    //swingServo.write(90);
-    //Serial.println("Swing Servo moved to 0 degrees (simulating -90 degrees).");
-    //delay(500); // Wait for 1 second
-    
-    // Move to position 90 degrees (simulating 0 degrees)
     swingServo.write(45);
-    Serial.println("Swing Servo moved to 90 degrees (simulating 0 degrees).");
+    Serial.println("Swing Servo moved to 45 degrees.");
     delay(500); // Wait for 0.5 second
 
-    // Move to position 180 degrees (simulating 90 degrees)
-    //swingServo.write(90);
-    //Serial.println("Swing Servo moved to 180 degrees (simulating 90 degrees).");
-    //delay(500); // Wait for 0.5 second
-
-    // Move back to position 90 degrees (simulating 0 degrees)
     swingServo.write(135);
-    Serial.println("Swing Servo moved back to 90 degrees (simulating 0 degrees).");
+    Serial.println("Swing Servo moved to 135 degrees.");
     delay(500); // Wait for 0.5 second
   } else if (swingStatus == "false") {
     swingServo.write(90);   // Turn the servo off to 0 degrees
@@ -306,51 +301,44 @@ void controlServo() {
   Serial.println("---------------------------------------------------");
 }
 
-// Function to check the real-time database and play the music if needed
 void checkAndPlayMusic() {
-  String playing, current_playing;
-  // Check if music should be playing
+  String playing;
   all.getFbString("/music/playing", playing);
-  
-  if (playing == "1") {
-    // Get the current playing file path
-    all.getFbString("/music/current_playing", current_playing);
-    
-    // Play the file
-    readFileFromStorage(current_playing.c_str());
-    
-    // Once done, set playing back to "0"
+
+  if (playing == "1" && !isPlayingMusic) {
+    all.getFbString("/music/current_playing", currentMusicFile);
+    isPlayingMusic = true;
+    playMusic(currentMusicFile.c_str());
+  }
+}
+
+void playMusic(const char* filePath) {
+  Serial.println("-------------------Play Music--------------------------------");
+  Serial.print("Playing file: ");
+  Serial.println(filePath);
+  String url = String("https://firebasestorage.googleapis.com/v0/b/") + storageBucket + "/o/" + filePath + "?alt=media&token=" + databaseSecret;
+  http.begin(url);
+  int httpCode = http.GET();
+  if (httpCode == HTTP_CODE_OK) {
+    audioStream = http.getStreamPtr();
+  } else {
+    Serial.printf("Failed to get file: %d\n", httpCode);
+    http.end();
+    isPlayingMusic = false; // Reset the state
+    return;
+  }
+}
+
+void processMusicChunk() {
+  if (audioStream && audioStream->available()) {
+    size_t bytesRead = audioStream->readBytes(buffer, AUDIO_BUFFER_SIZE);
+    size_t bytesWritten = 0;
+    i2s_write(I2S_NUM_0, buffer, bytesRead, &bytesWritten, portMAX_DELAY);
+  } else {
+    Serial.println("Finished playing audio");
+    http.end();
+    isPlayingMusic = false; // Reset the state
     all.setFbString("/music/playing", "0");
   }
 }
 
-void readFileFromStorage(const char* filePath) {
-  Serial.println("-------------------read from fire storage--------------------------------");
-  Serial.print("Reading file: ");
-  Serial.println(filePath);
-
-  HTTPClient http;
-  String url = String("https://firebasestorage.googleapis.com/v0/b/") + storageBucket + "/o/" + filePath + "?alt=media&token=" + databaseSecret;
-  http.begin(url);
-
-  int httpCode = http.GET();
-  if (httpCode > 0) {
-    Serial.println(httpCode);
-    if (httpCode == HTTP_CODE_OK) {
-      WiFiClient *stream = http.getStreamPtr();
-      size_t bytesRead = 0;
-
-      while (http.connected() && (bytesRead = stream->readBytes(buffer, AUDIO_BUFFER_SIZE)) > 0) {
-        size_t bytesWritten = 0;
-        i2s_write(I2S_NUM_0, buffer, bytesRead, &bytesWritten, portMAX_DELAY);
-      }
-
-      Serial.println("Finished playing audio");
-    }
-  } else {
-    Serial.printf("GET... failed, error: %s\n", http.errorToString(httpCode).c_str());
-  }
-
-  http.end();
-  Serial.println("---------------------------------------------------");
-}
