@@ -8,8 +8,8 @@
 #include "camera_pins.h"
 
 // WiFi credentials
-const char* ssid = "TOPNET_UKHT";
-const char* password = "darhammouda2027";
+const char* ssid = "Galaxy A20s4417";
+const char* password = "1234567899";
 
 // Firebase Configuration
 const char *firebaseHost = "https://litbebe-a66b1-default-rtdb.europe-west1.firebasedatabase.app/";
@@ -54,7 +54,7 @@ void setup() {
   // Use higher resolution and better JPEG quality if PSRAM is available
   if(psramFound()){
     config.frame_size = FRAMESIZE_UXGA; // or FRAMESIZE_HD
-    config.jpeg_quality = 10; // Lower number means higher quality
+    config.jpeg_quality = 8; // Lower number means higher quality
     config.fb_count = 2;
     config.grab_mode = CAMERA_GRAB_LATEST;
     config.fb_location = CAMERA_FB_IN_PSRAM;
@@ -129,7 +129,7 @@ void takeAndUploadPicture() {
 
   // Send POST request to server with base64 image data
   HTTPClient http;
-  http.begin("http://192.168.1.17:3000/upload"); // Replace "your_server" with your server address
+  http.begin("http://192.168.202.187:3000/upload"); // Replace "your_server" with your server address
   http.addHeader("Content-Type", "application/json");
 
   // Prepare the JSON payload

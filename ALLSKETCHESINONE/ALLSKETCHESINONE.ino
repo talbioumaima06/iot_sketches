@@ -285,15 +285,15 @@ void controlServo() {
   all.getFbString("Swings", swingStatus);
   int swingPosition = swingStatus.toInt();
   if (swingStatus == "true") {
-    swingServo.write(45);
+    swingServo.write(90);
     Serial.println("Swing Servo moved to 45 degrees.");
     delay(500); // Wait for 0.5 second
 
-    swingServo.write(135);
+    swingServo.write(15);
     Serial.println("Swing Servo moved to 135 degrees.");
     delay(500); // Wait for 0.5 second
   } else if (swingStatus == "false") {
-    swingServo.write(90);   // Turn the servo off to 0 degrees
+    swingServo.write(45);   // Turn the servo off to 0 degrees
     Serial.println("Swing Servo turned off.");
   } else {
     Serial.println("Invalid swing status.");
